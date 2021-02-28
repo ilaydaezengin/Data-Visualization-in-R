@@ -1,0 +1,138 @@
+---
+title: "ex3"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r}
+library(data.table)
+library(magrittr)
+library(tidyr)
+```
+
+
+```{r}
+product_dt <- fread("C:/Users/ilayd/OneDrive/Masaüstü/R/extdata (1)/extdata/example_product_data.csv")
+product_dt
+```
+
+
+```{r}
+product_dt <- melt(product_dt, id.vars = "name", measure.vars = c("producta","productb"), variable.name = "product", value.name = "amount")
+```
+
+
+```{r}
+dcast(product_dt,...~product, value.var = "amount")
+```
+
+
+```{r}
+weather_dt <- fread("C:/Users/ilayd/OneDrive/Masaüstü/R/extdata (1)/extdata/weather.txt")
+weather_dt
+```
+
+
+```{r}
+dt <- melt(weather_dt, id.vars = c("id", "year", "month", "element"),
+variable.name = "day",
+value.name = "temp")
+dt[, day := as.integer(gsub("d", "", day))]
+dt[, date := paste(year, month, day, sep = "-")] # option using paste
+dt[, c("year", "month", "day") := NULL] # remove reduntant columns
+
+dt[, element := tolower(element)] # TMAX -> tmax
+dt <- dcast(dt, ... ~ element, value.var = "temp") # long -> wide
+dt <- dt[!(is.na(tmax) & is.na(tmin))] # remove entries with both NA values,
+# na.omit(dt) would also do the job
+head(dt)
+```
+```{r}
+path <- "C:/Users/ilayd/OneDrive/Masaüstü/R/extdata (1)/extdata/baby-names"
+files <- list.files(path, full.names = TRUE)
+# See one file
+head(fread(files[1]))
+
+```
+
+
+```{r}
+names(files) <- basename(files)
+```
+
+
+```{r}
+tables <- lapply(files, fread)
+# bind all tables into one using rbindlist,
+# keeping the list names (the filenames) as an id column.
+dt <- rbindlist(tables, idcol = "filename")
+```
+
+
+```{r}
+dt<- separate(dt,col = "filename", into = c("year","sex"), extra = "drop")
+head(dt)
+```
+
+
+```{r}
+mtcars_dt <- as.data.table(mtcars)
+mtcars_dt[, carname := rownames(mtcars)]
+dt1 <- mtcars_dt[5:25,.(carname, mpg, cyl)]
+dt2 <- mtcars_dt[1:10, .(carname, gear)]
+```
+
+
+```{r}
+m <- merge(dt1, dt2, by = "carname", all = FALSE)
+nrow(m) 
+```
+
+
+```{r}
+m2 <- merge(dt1, dt2, by = "carname", all = TRUE)
+nrow(m2) 
+```
+```{r}
+m3 <- merge(dt1, dt2, by = "carname", all.x = TRUE) 
+nrow(m3)
+```
+
+
+```{r}
+gt <- fread("C:/Users/ilayd/OneDrive/Masaüstü/R/extdata (1)/extdata/eqtl/genotype.txt")
+dim(gt)
+```
+
+
+```{r}
+growth <- fread("C:/Users/ilayd/OneDrive/Masaüstü/R/extdata (1)/extdata/eqtl/growth.txt")
+head(growth)
+head(gt[,1:5])
+```
+
+
+```{r}
+gt <- melt(gt,id.vars = "strain", variable.name = "marker", value.name = "gt")
+growth <- melt(growth, id.vars = "strain", variable.name = "media", value.name = "growth_rate")
+```
+
+
+```{r}
+dt <- merge(growth, gt, by = "strain", allow.cartesian  = TRUE)
+dt[,gt:= as.factor(gt)]
+dt[,strain:= as.factor(strain)]
+dt[,marker:= as.factor(marker)]
+head(dt)
+summary(dt)
+```
+```{r}
+library(ggplot2)
+ggplot(dt[marker %in% c("mrk_5211", "mrk_1653")], aes(marker, growth_rate, color=gt)) +
+geom_boxplot() + facet_wrap(~media)
+```
+
+## R Markdown
+

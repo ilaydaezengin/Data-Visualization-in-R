@@ -1,0 +1,169 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+library(ggplot2)
+library(data.table)
+library(magrittr)
+library(tidyr)
+library(dplyr)
+library(BBmisc)
+gene <- fread("C:/Users/ilayd/OneDrive/Masaüstü/R/extdata_genom/extdata/eqtl/gene.txt")
+genotype <- fread("C:/Users/ilayd/OneDrive/Masaüstü/R/extdata_genom/extdata/eqtl/genotype.txt")
+genotype <- melt(genotype, id.vars = "strain", variable.name = "marker",
+value.name = "genotype")
+growth <- fread("C:/Users/ilayd/OneDrive/Masaüstü/R/extdata_genom/extdata/eqtl/growth.txt")
+growth <- melt(growth, id.vars = "strain", variable.name = "media",
+value.name = "growth_rate")
+marker <- fread("C:/Users/ilayd/OneDrive/Masaüstü/R/extdata_genom/extdata/eqtl/marker.txt")
+```
+```{r}
+getMaltoseDt = function(mrk){
+growth_mrk <- merge(growth, genotype[marker == mrk, .(strain, genotype)],
+by = "strain")
+growth_mrk[media == "YPMalt"]
+}
+# boxplot
+plot_growth_one_mk <- function(mk){
+ggplot(getMaltoseDt(mk), aes(genotype, growth_rate)) +
+geom_boxplot() +
+labs(title = mk) + theme_bw(base_size = 16) +
+theme(plot.title = element_text(hjust = 0.5))
+}
+plot_growth_one_mk("mrk_5211")
+```
+
+
+```{r}
+dt <- getMaltoseDt("mrk_5211")
+wilcox.test(alternative="two.sided",growth_rate ~ genotype, data=dt)
+```
+
+
+```{r}
+dt2 <- getMaltoseDt("mrk_1653")
+wilcox.test(alternative="two.sided",growth_rate ~ genotype, data=dt2)
+```
+
+
+```{r}
+dt3 <- getMaltoseDt("mrk_5091")
+wilcox.test(alternative="two.sided",growth_rate ~ genotype, data=dt3)
+```
+
+
+```{r}
+getPVal = function(mrk,test = c("w", "t")){
+  dt <- getMaltoseDt(mrk)
+  if(test == "wilcoxon"){
+  pval <- wilcox.test(alternative="two.sided",growth_rate ~ genotype, data=dt)$p.value
+  }else{
+    pval <- t.test(alternative="two.sided",growth_rate ~ genotype, data=dt)$p.value
+  }
+  return(pval)
+}
+```
+
+
+```{r}
+getPVal("mrk_1653", test = "w")
+```
+```{r}
+stats  <- fread("C:/Users/ilayd/OneDrive/Masaüstü/R/extdata (1)/extdata/stats-pitfalls.csv")
+```
+
+
+```{r}
+ggplot(melt(stats), aes(variable,value)) + geom_boxplot() 
+```
+
+
+```{r}
+ggplot(melt(stats), aes(value)) + geom_histogram() +
+facet_wrap(~variable, scales = "free") +
+geom_vline(aes(xintercept=mean(value)))
+```
+
+
+```{r}
+wilcox.test(stats$group1,stats$group2)$p.value
+```
+
+
+```{r}
+t.test(stats$group1,stats$group2)$p.value
+```
+
+
+```{r}
+ggplot(melt(stats), aes(variable, value)) + geom_boxplot() +
+stat_summary(fun.y=mean, geom="point", col="darkred") 
+```
+
+
+```{r}
+mks_geno <- genotype[marker %in% c("mrk_5091", "mrk_5211")] %>%
+spread(marker, genotype)
+table(mks_geno[, 2:3])
+```
+
+
+```{r}
+tst <- fisher.test(table(mks_geno[, 2:3]))
+tst
+```
+
+
+```{r}
+marker_test <- function(marker1, marker2, alternative = "two.sided"){
+mks_geno <- genotype[marker %in% c(marker1, marker2)] %>%
+spread(marker, genotype)
+table_markers <- table(mks_geno[, 2:3])
+pval <- fisher.test(table_markers, alternative = alternative)$p.value
+return(pval)
+}
+marker_test("mrk_1","mrk_13314", alternative = "two.sided")
+```
+
+
+```{r}
+genotype[genotype == "Lab strain", .N] / nrow(genotype)
+```
+
+
+```{r}
+mk_geno <- genotype[marker == "mrk_13314"]
+binom.test(mk_geno[genotype == "Lab strain", .N], nrow(mk_geno),
+p = .5, alternative = "two.sided")$p.value
+```
+```{r}
+genotype_marker_test <- function(mk){
+mk_geno <- genotype[marker == mk]
+binom.test(mk_geno[genotype == "Lab strain", .N], nrow(mk_geno),
+p = .5, alternative = "two.sided")$p.value
+}
+genotype_marker_test(mk = "mrk_3385")
+```
+
+
+```{r}
+markers <- unique(genotype$marker)
+pvals <- sapply(markers, function(mk){
+genotype_marker_test(mk)
+})
+names(pvals) <- markers
+ggplot(data.table(pvals=pvals), aes(pvals)) + geom_histogram()
+```
+
+
+```{r}
+sum(pvals < 0.05)/length(pvals)
+```
+
+
+```{r}
+```
+
+

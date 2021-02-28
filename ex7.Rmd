@@ -1,0 +1,209 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+```{r}
+library(ggplot2)
+library(data.table)
+library(magrittr)
+library(tidyr)
+library(dplyr)
+library(patchwork) # optional, makes plots nicer
+```
+```{r}
+genotype <- fread("C:/Users/ilayd/OneDrive/Masaüstü/R/extdata_genom/extdata/eqtl/genotype.txt")
+genotype <- melt(genotype, id.vars = "strain", variable.name = "marker",
+value.name = "genotype")
+growth <- fread("C:/Users/ilayd/OneDrive/Masaüstü/R/extdata_genom/extdata/eqtl/growth.txt")
+growth <- melt(growth, id.vars = "strain", variable.name = "media",
+value.name = "growth_rate")
+marker <- fread("C:/Users/ilayd/OneDrive/Masaüstü/R/extdata_genom/extdata/eqtl/marker.txt")
+```
+
+
+```{r}
+# Plotting the growth rate difference
+getMaltoseDt = function(mrk){
+growth_mrk <- merge(growth, genotype[marker %in% mrk, .(strain, genotype, marker)],
+by = "strain", allow.cartesian = TRUE)
+growth_mrk[media == "YPMalt"]
+}
+# boxplot
+plot_growth_one_mk <- function(mk){
+ggplot(getMaltoseDt(mk), aes(genotype, growth_rate)) +
+geom_boxplot() +
+labs(title = mk) + theme_bw(base_size = 16)
+}
+plot_growth_one_mk("mrk_5091")
+```
+
+
+```{r}
+# Function to calculate the difference of the median of two genotypes
+median_diff <- function(dt){
+dt[genotype == "Wild isolate", median(growth_rate, na.rm=T)] -
+dt[genotype == "Lab strain", median(growth_rate, na.rm=T)]
+}
+# Function to permute the table, plot the resulting histogram
+# and compute a p-value
+p_val_medians <- function(dt, N_permu = 1000){
+# It will return both a pvalue and plot a histogram of T_star
+T_ref <- median_diff(dt)
+T_star <- sapply(1:N_permu, function(x){
+median_diff(dt[, genotype := sample(genotype)]) })
+# Plot
+g <- ggplot(data = data.table(T_star = T_star), aes(T_star)) + geom_histogram() +
+geom_vline(aes(xintercept=T_ref, color="T_ref")) + xlim(-3,3)
+print(g) # Needed to render plot inside function call
+# Compute and return the p value
+p_val <- (sum(T_star > T_ref | T_star < -T_ref) + 1) / (N_permu + 1)
+p_val
+}
+# Calling the function:
+p_val_medians(getMaltoseDt("mrk_5091"))
+```
+
+
+```{r}
+mks_geno <- genotype[marker %in% c("mrk_5091", "mrk_5211")] %>%
+spread(marker, genotype)
+```
+
+
+```{r}
+T_ref <- mks_geno[mrk_5091 == mrk_5211, .N]/nrow(mks_geno) 
+
+N_permu <- 1000
+T_star <- sapply(1:N_permu, function(x){
+mks_geno[mrk_5091 == sample(mrk_5211), .N]/nrow(mks_geno)})
+```
+```{r}
+ggplot(data = data.table(T_star = T_star), aes(T_star)) + geom_histogram() +
+geom_vline(aes(xintercept=T_ref, color="T_ref")) + xlim(0,1)
+```
+
+
+```{r}
+p_val <- (sum(T_star > T_ref) + 1) / (N_permu + 1)
+p_val
+```
+
+
+```{r}
+conditioning_dt <- merge(mks_geno, growth[media == "YPMalt"], by = "strain")
+```
+
+
+```{r}
+a <- ggplot(conditioning_dt, aes(mrk_5211, growth_rate)) +
+geom_boxplot() +
+facet_wrap(~ mrk_5091) +
+labs(title="conditioned on marker 5091")
+b <- ggplot(conditioning_dt, aes(mrk_5091, growth_rate)) +
+geom_boxplot() +
+facet_wrap(~ mrk_5211) +
+labs(title="conditioned on marker 5211")
+a / b #Patchwork syntax to nicely align p
+```
+
+
+```{r}
+p_val_condition_on <- function(test_mrk = "mrk_5078", condition_mrk = "mrk_5211", N_permu = 1000) {
+# On the simple growth vs genotype case:
+## Ho: For each marker, the growth medians are the same for Lab and Wild
+## Tref: median(growth on Wild) - median(growth on Lab), for each marker
+# On the growth vs genotype case, conditioned on another marker:
+## Ho: For each marker, the growth medians are the same for Lab and Wild,
+## no matter the conditioned marker
+## Tref: mean across subgroups of {median(growth on Wild) - median(growth on Lab)},
+## for each marker
+# Prepare data table
+conditioned_dt <- getMaltoseDt(c(test_mrk, condition_mrk)) %>%
+spread(marker, genotype)
+setnames(conditioned_dt, test_mrk, "test_mrk")
+setnames(conditioned_dt, condition_mrk, "condition_mrk")
+# Get T_ref
+median_ref <- conditioned_dt[, median(growth_rate, na.rm=T), by = c("test_mrk", "condition_mrk")] %>%
+spread(test_mrk, V1)
+T_ref <- mean(median_ref[, `Wild isolate` - `Lab strain`])
+# Do permutations conditioned on the other marker
+T_star <- numeric(N_permu)
+for(i in 1:N_permu){
+conditioned_dt[, test_mrk := sample(test_mrk), by = condition_mrk]
+medians <- conditioned_dt[, median(growth_rate, na.rm=T), by = c("test_mrk", "condition_mrk")] %>%
+spread(test_mrk, V1)
+T_star[i] <- mean(medians[, `Wild isolate` - `Lab strain`])
+}
+# Plot
+g <- ggplot(data = data.table(T_star = T_star), aes(T_star)) + geom_histogram() +
+geom_vline(aes(xintercept=T_ref, color="T_ref"))
+print(g)
+# P-value
+p_val <- (sum(T_star > T_ref) + 1) / (N_permu + 1)
+p_val
+}
+p_val_condition_on(test_mrk = "mrk_5091", condition_mrk = "mrk_5211")
+```
+```{r}
+p_val_condition_on(test_mrk = "mrk_5211", condition_mrk = "mrk_5091")
+```
+```{r}
+mystat <- function(x){
+median(x, na.rm=TRUE)
+}
+# Bootstrap and compute some function func
+boot <- function(x, func, B = 999){
+T_star <- sapply(1:B, function(i){
+xstar <- sample(x, replace=TRUE)
+func(xstar)
+}
+)
+return(T_star)
+}
+confint <- function(Tstar, alpha = 0.05){
+quantile(Tstar, c(alpha/2, 1-alpha/2))
+}
+conf_int_plot <- function(marker){
+plot_list <- list("Lab strain" = NA, "Wild isolate" = NA)
+for(geno in c("Lab strain", "Wild isolate")){
+# geno = ’Lab strain’
+x <- getMaltoseDt(marker)[genotype == geno, growth_rate]
+T_star <- boot(x , mystat) # Bootstrap 1000 times and compute the median (mystat)
+T_ref <- median(x, na.rm=TRUE)
+CI_lab <- confint(T_star)
+# Plot histogram, add median and confidence interval as vertical lines
+g <- ggplot(data = data.table(T_star = T_star), aes(T_star)) + geom_histogram() +
+geom_vline(data=data.table(T_ref), aes(xintercept=T_ref, color="T_ref")) + xlim(4,10) +
+geom_vline(data=data.table(CI_lab), aes(xintercept=CI_lab[1], color="CI"), linetype="dashed") +
+geom_vline(data=data.table(CI_lab), aes(xintercept=CI_lab[2], color="CI"), linetype="dashed")
+plot_list[geno] <- list(g) # list is necessary to let patchwork interpret it right
+}
+# this is patchwork syntax
+# it nicely aligns plots above each other
+# this is completely optional
+plot_list[["Lab strain"]] / plot_list[["Wild isolate"]]
+}
+conf_int_plot("mrk_5211")
+```
+
+
+```{r}
+conf_int_plot("mrk_5091")
+```
+
+
+```{r}
+conf_int_plot("mrk_1653")
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```

@@ -1,0 +1,156 @@
+---
+title: "exercise2"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r}
+library(data.table)
+library(magrittr)
+```
+```{r}
+ratings_dt <- fread("C:/Users/ilayd/OneDrive/Masaüstü/R/extdata/extdata/BX-Book-Ratings.csv")
+users_dt <- fread("C:/Users/ilayd/OneDrive/Masaüstü/R/extdata/extdata/BX-Users.csv")
+books_dt <- fread("C:/Users/ilayd/OneDrive/Masaüstü/R/extdata/extdata/BX-Books.csv")
+```
+
+```{r}
+colnames(users_dt)
+typeof(users_dt$Age)
+users_dt$Age <- as.numeric(users_dt$Age)
+typeof(users_dt$Age)
+```
+```{r}
+summary(books_dt)
+```
+```{r}
+head(ratings_dt,5)
+tail(ratings_dt,5)
+```
+
+
+```{r}
+colnames(ratings_dt) <- gsub("-","_",colnames(ratings_dt))
+colnames(users_dt)
+
+```
+
+
+```{r}
+books_dt[, c("Image-URL-S","Image-URL-M","Image-URL-L"):=NULL]
+colnames(books_dt)
+```
+```{r}
+which.max(books_dt[,`Year-Of-Publication`])
+which.min(books_dt[, `Year-Of-Publication`])
+```
+
+
+```{r}
+books_dt[`Year-Of-Publication`>= 2000 & `Year-Of-Publication` <= 2010,.N,by ="Book-Author"]
+```
+
+
+```{r}
+sum(!is.na(users_dt))
+```
+```{r}
+ratings_dt[which.max(ratings_dt[,`Book-Rating`]),`Book-Rating`]
+```
+
+
+```{r}
+ratings_dt[`Book-Rating`>0,.N, by = "Book-Rating"][N == max(N)]
+```
+```{r}
+colnames(ratings_dt)
+
+```
+
+
+```{r}
+ratings_dt[`Book-Rating`== max(`Book-Rating`), "ISBN"] %>% head
+```
+
+
+```{r}
+ratings_dt <- ratings_dt[order(-`Book-Rating`)]
+ratings_dt
+```
+```{r}
+users_dt[, Country := tstrsplit(Location, ",")[[3]]]
+users_dt
+```
+```{r}
+nrow(users_dt[,.N,by = "Country"])
+```
+
+
+```{r}
+users_dt[, mean(Age, na.rm = TRUE)]
+```
+```{r}
+users_dt[, City := tstrsplit(Location,",")[[1]]]
+users_dt[City %in% c("nyc", "stockton","moscow"), .(mean_age = mean(Age,na.rm = TRUE)), by="City"]
+```
+```{r}
+ratings_dt[, High_Rating := ifelse(`Book-Rating`> 7, 1, 0)]
+ratings_dt
+```
+
+
+```{r}
+pr <- nrow(ratings_dt[High_Rating > 0])/nrow(ratings_dt)
+pr
+
+```
+
+
+```{r}
+setkey(books_dt,ISBN)
+books_dt
+```
+
+
+```{r}
+users_rated <- ratings_dt[,`User-ID`]
+users_dt[!(`User-ID` %in% users_rated)]
+
+```
+
+
+```{r}
+users_dt[`User-ID` %in% users_rated & !is.na(Age), .N, by =Age][N == max(N)]
+```
+
+
+```{r}
+ratings_dt[,.N,by = "User-ID"][,mean(N,na.rm = TRUE)]
+```
+
+
+```{r}
+ratings_dt[order(Year_Of_Publication, -Book_Rating),
+.(Book_Title, Year_Of_Publication, Book_Rating)] %>% head(1)
+```
+```{r}
+ratings_dt[, Rating_Count:=.N, by=ISBN]
+ratings_dt[ Rating_Count == max(Rating_Count), max(Year_Of_Publication)]
+```
+
+
+```{r}
+ratings_dt[, Max_Book_Rating := max(Book_Rating),by =ISBN]
+```
+
+
+```{r}
+authors <- c("Agatha Christie", "William Shakespeare", "Stephen King",
+"Ann M. Martin", "Carolyn Keene", "Francine Pascal",
+"Isaac Asimov", "Nora Roberts", "Barbara Cartland", "Charles Dickens")
+ratings_dt[Book_Author %in% authors,.(mean(Book_Rating),max(Book_Rating),.N),by =Book_Author]
+```
+
+## R Markdown
