@@ -1,0 +1,204 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+library(ggplot2)
+library(data.table)
+library(magrittr) # Needed for %>% operator
+library(tidyr)
+library(GGally)
+library(pheatmap)
+library(mclust)
+```
+```{r}
+expr <- readRDS("C:/Users/ilayd/OneDrive/Masaüstü/R/extdata_/extdata/cancer_data.rds") %>% as.data.table(keep.rownames="tumor_type")
+```
+
+
+```{r}
+ggcorr(expr[, !"tumor_type"])
+```
+
+
+```{r}
+expr_mat <- as.matrix(expr[, !"tumor_type"])
+rownames(expr_mat) <- expr[, tumor_type]
+pheatmap(expr_mat, cluster_rows = F, cluster_cols = F)
+```
+
+
+```{r}
+expr_melt <- melt(expr, id.vars='tumor_type')
+expr_melt[order(-value)]
+```
+
+
+```{r}
+ggplot(expr, aes(FUK, UGP2)) + geom_point()
+```
+```{r}
+expr[tumor_type == "DOHH2", FUK := NA]
+expr[tumor_type == "DOHH2", UGP2 := NA]
+```
+
+
+```{r}
+ggcorr(expr[, !"tumor_type"])
+```
+
+
+```{r}
+expr_mat <- as.matrix(expr[, !"tumor_type"])
+rownames(expr_mat) <- expr[, tumor_type]
+pheatmap(expr_mat, cluster_rows = F, cluster_cols = F)
+```
+
+
+```{r}
+iris_dt <- iris[,-"Species"]
+iris_dt <- as.matrix(iris_dt)
+pheatmap(iris_dt,show_rownames=F, cluster_rows=FALSE, 
+         cluster_cols=FALSE, scale = "column")
+```
+
+
+```{r}
+pheatmap(iris_dt, show_rownames = FALSE, scale='column', clustering_method = "complete")
+```
+```{r}
+rownames(iris_dt) <- 1:nrow(iris_dt)
+row.ann <- data.table(Species = iris$Species)
+pheatmap(iris_dt, annotation_row = row.ann, show_rownames=F,
+scale='column', clustering_method = "complete")
+```
+
+
+```{r}
+## pheatmap() returns an object with dendrograms
+h_complete <- pheatmap(iris_dt, annotation_row=row.ann, show_rownames=F,
+scale='column', clustering_method = "complete", silent=T)
+# silent=T prevent heatmap to be displayed again
+complete <- cutree(h_complete$tree_row, k = 3)
+complete
+```
+
+
+```{r}
+row.ann[, complete := factor(complete)]
+h_average <- pheatmap(iris_dt, annotation_row=row.ann, show_rownames=F,
+scale='column', clustering_method = "average")
+```
+
+
+```{r}
+average <- cutree(h_average$tree_row, k = 3)
+average
+```
+```{r}
+row.ann[,average := factor(average)]
+pheatmap(iris_dt, annotation_row=row.ann, show_rownames=F,
+scale='column', clustering_method = "average")
+```
+
+
+```{r}
+table(complete, average)
+```
+
+
+```{r}
+k <- 3
+X <- scale(iris_dt) # use the scaled variables for the clustering
+X = as.matrix(X)
+clust_km <- kmeans(X, k)
+clust_km$cluster # clusters of the best clustering
+```
+
+
+```{r}
+row.ann[,kmeans := factor(clust_km$cluster)]
+pheatmap(
+  X,        # X with ordered rows according to cluster number  
+  annotation_row = row.ann,show_rownames=F,
+scale='column', clustering_method = "average")
+```
+
+
+```{r}
+install.packages("fossil")
+library(fossil)
+rand.index(complete, complete)
+```
+
+
+```{r}
+row.ann[, Species:= as.numeric(Species)]
+```
+
+
+```{r}
+## compute all pairwise rand indices
+rand <- apply(row.ann, 2, function(i)
+apply(row.ann, 2, function(j) rand.index(as.numeric(i), as.numeric(j))))
+rand
+pheatmap(rand, cluster_cols = F, cluster_rows = F)
+```
+```{r}
+rand_dt <- data.table(rand, keep.rownames = 'Clustering1') %>% melt(id.vars='Clustering1',
+value.name='rand_index',
+variable.name='Clustering2')
+rand_dt[rand_index<1 & Clustering1=='Species'][which.max(rand_index)]
+```
+
+
+```{r}
+data(iris)
+iris_dt <- as.data.table(iris)
+pca_data <- iris_dt[Species == "setosa", -"Species"]
+pca <- prcomp(pca_data, center=TRUE, scale.=TRUE)
+pca
+```
+
+
+```{r}
+summary(pca)
+```
+
+
+```{r}
+proj <- as.data.table(predict(pca))
+ggplot(proj, aes(PC1, PC2)) + geom_point()
+```
+
+
+```{r}
+biplot(pca)
+```
+```{r}
+pc_iris <- cbind(iris_dt[Species == "setosa"], proj)
+pc_iris <- melt(pc_iris, id.vars = c("Species", 'PC1', 'PC2', 'PC3', 'PC4'))
+```
+
+
+```{r}
+ggplot(pc_iris, aes(value, PC1)) + geom_point() + facet_wrap(~variable, scales = 'free')
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+

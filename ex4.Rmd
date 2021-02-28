@@ -1,0 +1,121 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+iris <- as.data.table(iris)
+iris
+```
+```{r}
+melt_dt <- melt(iris, id.vars = "Species")
+ggplot(melt_dt,aes(value)) + geom_histogram() + facet_wrap(~variable)
+```
+```{r}
+install.packages('devtools')
+library(ggplot2)
+library(data.table)
+library(magrittr) # Needed for %>% operator
+library(tidyr)
+devtools::install_github("OakleyJ/MAS6005")
+library(MAS6005) # Install with devtools::install_github("OakleyJ/MAS6005")
+library(ggrepel)
+```
+
+
+```{r}
+ggplot(melt_dt,aes(variable, value)) + geom_boxplot() + geom_jitter()
+```
+
+
+```{r}
+ggplot(melt_dt,aes(variable, value)) +  geom_violin() + geom_boxplot(width=0.03, outlier.shape=NA) 
+```
+
+
+```{r}
+ggplot(melt_dt, aes(variable, value, color = Species)) +
+geom_dotplot(binaxis="y", stackdir="centerwhole", dotsize=0.3)
+```
+
+
+```{r}
+ggplot(iris,aes(Petal.Length,Petal.Width, color = Species)) +
+geom_point() + labs(x = "Petal Length", y = "Petal Width",
+title = "Relationship between petal length and width") 
+```
+
+
+```{r}
+anscombe_reshaped <- anscombe %>%
+as.data.table %>%
+.[, ID := seq(nrow(.))] %>%
+melt(id.var=c("ID")) %>%
+separate(variable, c("xy", "group"), sep=1) %>%
+dcast(... ~ xy) %>%
+.[, group := paste0("dataset_", group)]
+```
+
+
+```{r}
+anscombe_reshaped[, .(x_mean = mean(x),
+                      y_mean = mean(y),
+                      x_sd = sd(x),
+                      y_sd = sd(y)),
+                  by = "group"]
+```
+```{r}
+anscombe_reshaped[, .(correlation = cor(x, y)), by = "group"]
+```
+```{r}
+ggplot(anscombe_reshaped, aes(x,y)) + geom_point() + facet_wrap(~group)
+```
+
+
+```{r}
+boxplots_dt <- fread("C:/Users/ilayd/OneDrive/Masaüstü/R/extdata (2)/extdata/boxplots.csv")
+ggplot(melt(boxplots_dt), aes(variable,value)) + geom_boxplot()
+```
+
+
+```{r}
+ggplot(melt(boxplots_dt), aes(variable,value)) + geom_violin()
+```
+
+
+```{r}
+library(MAS6005)
+attach(medals)
+medals_dt <- as.data.table(medals)
+```
+```{r}
+ggplot(medals, aes(population,total)) + geom_point() +scale_x_log10() + scale_y_log10() + geom_text_repel(aes(label=code))
+```
+
+
+```{r}
+mtcars <- data.table(mtcars)
+ggplot(mtcars, aes(factor(cyl), mpg)) + geom_boxplot()
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
