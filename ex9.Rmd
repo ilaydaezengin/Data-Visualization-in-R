@@ -1,0 +1,82 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+library(ggplot2)
+library(data.table)
+library(magrittr)
+library(tidyr)
+library(dplyr)
+library(patchwork)
+```
+```{r}
+set.seed(10)
+n <- 100
+x <- rnorm(n)
+dt <- data.table(x)
+
+ggplot(dt, aes(x)) + geom_histogram(bins = 20) + xlim(-6,6) + labs(x = "observed_quantiles")
+
+x1=qnorm(ppoints(n))
+y = sort(x)
+
+dt <- data.table(x,y)
+ggplot(dt, aes(x1,y)) +geom_point() + geom_abline(intercept = 0, slope = 1, alpha = 0.5) + xlim(-6,6) + labs(x = "expected_quantiles", y = "observed_quantiles")
+```
+
+
+```{r}
+dt[, rshift := sort(rnorm(n, mean=4))]
+ggplot(dt, aes(rshift)) + geom_histogram(bins = 20) + xlim(-6,6) + labs(x = "rshift")
+ggplot(dt, aes(x1,rshift)) +geom_point() + geom_abline(intercept = 0, slope = 1, alpha = 0.5) + xlim(-6,6) + labs(x = "expected_quantiles", y = "rshift")
+
+```
+
+
+```{r}
+library(tidyr)
+library(data.table)
+library(ggplot2)
+library(ggthemes)
+## load the data
+genotype <- fread("C:/Users/ilayd/OneDrive/Masaüstü/R/extdata_genom/extdata/eqtl/genotype.txt")
+growth_rate <- fread("C:/Users/ilayd/OneDrive/Masaüstü/R/extdata_genom/extdata/eqtl/growth.txt")
+marker <- fread("C:/Users/ilayd/OneDrive/Masaüstü/R/extdata_genom/extdata/eqtl/marker.txt")
+setnames(marker, "id", "marker")
+genotype <- genotype %>%
+melt(id.vars = "strain", variable.name = "marker", value.name = "genotype")
+```
+
+
+```{r}
+genotype_growth <- merge(genotype, growth_rate, by = "strain")
+test_res <- genotype_growth[, .(pval=wilcox.test(YPMalt ~ genotype)$p.value), by="marker"]
+ggplot(test_res, aes(pval)) + geom_histogram(boundary = TRUE, bins=50)
+ggplot(test_res[order(pval)], aes(-log10(ppoints(pval)), -log10(pval))) + geom_point() + geom_abline()
+```
+
+
+```{r}
+test_res[, padj:=p.adjust(pval, method="BH")]
+test_res[padj < 0.1][order(padj)]
+```
+
+
+```{r}
+marker_pval <- merge(marker, test_res, by = "marker")
+ggplot(marker_pval, aes(start, -log10(pval))) +
+geom_point() +
+facet_wrap(~chrom, scales = "free_x", nrow = 2) + theme_bw() +
+theme(axis.text.x = element_blank())
+```
+
+
+```{r}
+marker_pval[padj < 0.05, .N]
+```
+```{r}
+head(marker_pval[padj < 0.05][order(pval)])
+```
+

@@ -1,0 +1,173 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+ 
+
+```{r}
+library(ggplot2)
+library(data.table)
+library(magrittr)
+library(tidyr)
+library(dplyr)
+library(patchwork) # optional, makes plots nicer
+```
+```{r}
+heights <- fread("C:/Users/ilayd/OneDrive/Masaüstü/R/extdata_moodle/extdata_moodle/height.csv") %>% na.omit() %>%
+.[, sex:=as.factor(toupper(sex))]
+heights
+```
+
+
+```{r}
+m <- lm(data = heights, height ~ sex + mother + father)
+summary(m)
+```
+
+
+```{r}
+prediction = data.table(prediction = predict(m), residuals = residuals(m))
+ggplot(prediction,aes(prediction,residuals)) + geom_point() + geom_hline(yintercept = 0)
+```
+```{r}
+ggplot(prediction,aes(sample = residuals)) + geom_qq() + geom_qq_line()
+```
+
+
+```{r}
+heights_male <- heights[sex == "M"]
+m1 <- lm(data = heights_male, height ~ father)
+m1
+```
+
+
+```{r}
+m2 <- lm(data = heights_male, father ~ height)
+m2
+```
+
+
+```{r}
+heights_male[, predicted_student_height := predict(m1)]
+heights_male[, predicted_father_height := predict(m2)]
+
+```
+
+
+```{r}
+ggplot(heights_male) + 
+  geom_point(aes(father,height)) + 
+  geom_line(aes(father, predicted_student_height, color = "predicted_student")) + geom_line(aes(predicted_father_height, height, color = "predicted_father"))
+```
+
+
+```{r}
+pca_obj <- princomp(heights_male[, .(height,father)])
+slope <- pca_obj$loadings["height","Comp.1"] / pca_obj$loadings["father","Comp.1"]
+intercept <- pca_obj$center["height"] - pca_obj$center["father"] * slope
+
+ggplot(heights_male) +
+geom_point(aes(father, height)) +
+geom_line(aes(father, predicted_student_height, color = "predicted_student")) +
+geom_line(aes(predicted_father_height, height, color = "predicted_father")) +
+geom_abline(aes(intercept = intercept, slope = slope, color = "pc_1"))
+```
+
+
+```{r}
+eqtl_dir <- "C:/Users/ilayd/OneDrive/Masaüstü/R/extdata_moodle/extdata_moodle/eqtl"
+growth <- fread(file.path(eqtl_dir, "growth.txt"))
+growth <- growth %>% melt(id.vars="strain", variable.name="media", value.name="growth_rate")
+growth <- growth[media=="YPMalt"]
+genotype <- fread(file.path(eqtl_dir, "genotype.txt"))
+genotype <- genotype[, .(strain, mrk_5211, mrk_5091)]
+```
+```{r}
+table <- merge(growth, genotype)
+full <- table[, lm(growth_rate ~ mrk_5211 + mrk_5091)]
+summary(full)
+```
+
+
+```{r}
+reduced <- table[, lm(growth_rate ~ mrk_5211)]
+# Ho: adding the genotype information of mrk_5091 does not improve the model.
+## note: observe the probability under the null hypothesis of an F statistic as
+## extreme as the one observed here is rather high (> 0.05) so we would not
+## reject the null hypothesis.
+anova(reduced, full)
+```
+
+
+```{r}
+library(datasets)
+library(ggplot2)
+data(iris)
+ggplot(iris, aes(x=Sepal.Length, y=Sepal.Width, color=Species)) +
+geom_point()
+```
+
+
+```{r}
+base_model <- lm(Sepal.Width ~ Sepal.Length, data=iris)
+base_model
+```
+
+
+```{r}
+iris$base_preds <- predict(base_model, newdata=iris)
+ggplot(iris, aes(x=Sepal.Length, y=Sepal.Width, color=Species)) +
+geom_point() +
+geom_line(aes(x=Sepal.Length, y=base_preds, color=Species)) +
+facet_grid(. ~ Species) + ggtitle("Base Model")
+```
+
+
+```{r}
+model_species_intercept <- lm(Sepal.Width ~ Sepal.Length + Species, data=iris)
+model_species_intercept
+```
+
+
+```{r}
+iris$preds <- predict(model_species_intercept, newdata=iris)
+ggplot(iris, aes(x=Sepal.Length, y=Sepal.Width, color=Species)) +
+geom_point() +
+geom_line(aes(x=Sepal.Length, y=preds, color=Species)) +
+facet_grid(. ~ Species) + ggtitle("Different intercepts, same slope")
+```
+
+
+```{r}
+model_species_intercept_slope <- lm(Sepal.Width ~ Sepal.Length*Species, data=iris)
+model_species_intercept_slope
+```
+```{r}
+iris$preds <- predict(model_species_intercept_slope, newdata=iris)
+ggplot(iris, aes(x=Sepal.Length, y=Sepal.Width, color=Species)) +
+geom_point() +
+geom_line(aes(x=Sepal.Length, y=preds, color=Species))+
+facet_grid(. ~ Species) + ggtitle("Different intercepts and slopes")
+```
+
+
+```{r}
+anova(base_model, model_species_intercept)
+# Ho: adding species info does not improve the model
+# Conclusion: F statistic is big, p value < 0.05, we reject Ho
+# Therefore, adding species info does improve the model
+```
+
+
+```{r}
+anova(model_species_intercept, model_species_intercept_slope)
+# Ho: modelling the petal length independently per species does not improve the model
+# Conclusion: F statistic is big, p value < 0.05, we reject Ho
+## note: in both cases, using a more complex model allowed to fit the data better
+```
+
+
+```{r}
+```
+
+
